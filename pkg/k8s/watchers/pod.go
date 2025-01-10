@@ -826,11 +826,8 @@ func (k *K8sPodWatcher) upsertHostPortMapping(oldPod, newPod *slim_corev1.Pod, o
 			ExtTrafficPolicy:    dpSvc.ExtTrafficPolicy,
 			IntTrafficPolicy:    dpSvc.IntTrafficPolicy,
 			HealthCheckNodePort: dpSvc.HealthCheckNodePort,
-			Name: loadbalancer.ServiceName{
-				Name:      fmt.Sprintf("%s/host-port/%d", newPod.ObjectMeta.Name, dpSvc.Frontend.L3n4Addr.Port),
-				Namespace: newPod.ObjectMeta.Namespace,
-			},
-			LoopbackHostport: dpSvc.LoopbackHostport,
+			Name:                *loadbalancer.NewServiceName(newPod, dpSvc.Frontend.L3n4Addr.Port, ""),
+			LoopbackHostport:    dpSvc.LoopbackHostport,
 		}
 
 		if _, _, err := k.svcManager.UpsertService(p); err != nil {
@@ -865,13 +862,14 @@ func (k *K8sPodWatcher) deleteHostPortMapping(pod *slim_corev1.Pod, podIPs []str
 
 	for _, dpSvc := range svcs {
 		svc, _ := k.svcManager.GetDeepCopyServiceByFrontend(dpSvc.Frontend.L3n4Addr)
+		dpSvcName := loadbalancer.NewServiceName(pod, dpSvc.Frontend.L3n4Addr.Port, "")
 		// Check whether the service being deleted is in fact "owned" by the pod being deleted.
 		// We want to make sure that the pod being deleted is in fact the "current" backend that
 		// "owns" the hostPort service. Otherwise we might break hostPort connectivity for another
 		// pod which may have since claimed ownership for the same hostPort service, which was previously
 		// "owned" by the pod being deleted.
 		// See: https://github.com/cilium/cilium/issues/22460.
-		if svc != nil && !utils.DeepEqualBackends(svc.Backends, dpSvc.Backends) {
+		if svc != nil && !(svc.Name.Equal(*dpSvcName) && utils.DeepEqualBackends(svc.Backends, dpSvc.Backends)) {
 			continue
 		}
 
