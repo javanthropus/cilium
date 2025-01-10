@@ -13,6 +13,7 @@ import (
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/cidr"
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
+	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	"github.com/cilium/cilium/pkg/option"
 )
 
@@ -345,6 +346,20 @@ type ServiceName struct {
 	Namespace string
 	Name      string
 	Cluster   string
+}
+
+func NewServiceName(pod *slim_corev1.Pod, port uint16, cluster string) *ServiceName {
+	return &ServiceName{
+		Name:      fmt.Sprintf("%s/pod-id/%s/host-port/%d", pod.ObjectMeta.Name, pod.ObjectMeta.UID, port),
+		Namespace: pod.ObjectMeta.Namespace,
+		Cluster:   cluster,
+	}
+}
+
+func (n *ServiceName) Equal(other ServiceName) bool {
+	return n.Namespace == other.Namespace &&
+		n.Name == other.Name &&
+		n.Cluster == other.Cluster
 }
 
 func (n ServiceName) String() string {
